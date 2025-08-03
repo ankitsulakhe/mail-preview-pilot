@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import html2canvas from "html2canvas";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -10,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { Mail, Send, Eye, Code, CheckCircle, XCircle, Loader2 } from "lucide-react";
+import { Mail, Send, Eye, Code, CheckCircle, XCircle, Loader2, Camera } from "lucide-react";
 
 // Email validation schema
 const emailFormSchema = z.object({
@@ -110,7 +111,9 @@ const defaultHtmlTemplate = `<!DOCTYPE html>
 const EmailTester = () => {
   const [activeTab, setActiveTab] = useState("editor");
   const [isLoading, setIsLoading] = useState(false);
+  const [isCapturing, setIsCapturing] = useState(false);
   const [lastSentStatus, setLastSentStatus] = useState<"success" | "error" | null>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
   
   const { toast } = useToast();
 
@@ -173,6 +176,48 @@ const EmailTester = () => {
       title: "Form Reset",
       description: "All fields have been cleared",
     });
+  };
+
+  const captureSnapshot = async () => {
+    if (!previewRef.current || !watchedValues.htmlContent) {
+      toast({
+        title: "No Preview to Capture",
+        description: "Please enter HTML content first to capture a snapshot",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsCapturing(true);
+    try {
+      const canvas = await html2canvas(previewRef.current, {
+        backgroundColor: '#ffffff',
+        scale: 2,
+        logging: false,
+        useCORS: true,
+        allowTaint: true,
+      });
+
+      // Create download link
+      const link = document.createElement('a');
+      link.download = `email-preview-${Date.now()}.png`;
+      link.href = canvas.toDataURL();
+      link.click();
+
+      toast({
+        title: "📸 Snapshot Captured!",
+        description: "Email preview has been saved as PNG image",
+        duration: 3000,
+      });
+    } catch (error) {
+      toast({
+        title: "Snapshot Failed",
+        description: "Could not capture the preview. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCapturing(false);
+    }
   };
 
   return (
@@ -289,8 +334,33 @@ const EmailTester = () => {
               
                   <TabsContent value="preview" className="space-y-4">
                     <div className="space-y-2">
-                      <Label>Email Preview</Label>
-                      <div className="border border-border rounded-lg p-4 bg-muted/50 min-h-[400px] overflow-auto">
+                      <div className="flex items-center justify-between">
+                        <Label>Email Preview</Label>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={captureSnapshot}
+                          disabled={isCapturing || !watchedValues.htmlContent}
+                          className="flex items-center gap-2"
+                        >
+                          {isCapturing ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              Capturing...
+                            </>
+                          ) : (
+                            <>
+                              <Camera className="w-4 h-4" />
+                              Take Snapshot
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                      <div 
+                        ref={previewRef}
+                        className="border border-border rounded-lg p-4 bg-muted/50 min-h-[400px] overflow-auto"
+                      >
                         {watchedValues.htmlContent ? (
                           <div 
                             dangerouslySetInnerHTML={{ __html: watchedValues.htmlContent }}
