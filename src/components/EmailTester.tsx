@@ -11,6 +11,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { FunctionsHttpError } from "@supabase/supabase-js";
 import { Mail, Send, Eye, Code, CheckCircle, XCircle, Loader2, Camera } from "lucide-react";
 
 // Email validation schema
@@ -129,35 +131,46 @@ const EmailTester = () => {
 
   const watchedValues = form.watch();
 
-  // Simulate email sending with proper validation
+  // Send the test email for real
   const handleSendTest = async (data: EmailFormData) => {
     setIsLoading(true);
     setLastSentStatus(null);
 
     try {
-      // Preview mode: real sending is enabled once the sender domain is verified
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const { data: result, error } = await supabase.functions.invoke("send-test-email", {
+        body: {
+          to: data.to,
+          subject: data.subject,
+          html: data.htmlContent,
+        },
+      });
 
-      const isSuccess = true;
-
-      if (isSuccess) {
-        setLastSentStatus("success");
-        toast({
-          title: "✅ Email Sent Successfully!",
-          description: `Test email has been sent to ${data.to}`,
-          duration: 5000,
-        });
-      } else {
-        throw new Error("Failed to send email");
+      if (error) {
+        const details =
+          error instanceof FunctionsHttpError ? await error.context.text() : error.message;
+        throw new Error(details);
       }
-      
+      if (result?.error) {
+        throw new Error(typeof result.error === "string" ? result.error : "Failed to send email");
+      }
+
+      setLastSentStatus("success");
+      toast({
+        title: "✅ Email Sent Successfully!",
+        description: `Test email has been sent to ${data.to}`,
+        duration: 5000,
+      });
     } catch (error) {
+      console.error("send-test-email failed:", error);
       setLastSentStatus("error");
       toast({
         title: "❌ Email Failed to Send",
-        description: "There was an error sending your test email. Please check your email settings and try again.",
+        description:
+          error instanceof Error && error.message
+            ? error.message.slice(0, 200)
+            : "There was an error sending your test email. Please try again.",
         variant: "destructive",
-        duration: 5000,
+        duration: 6000,
       });
     } finally {
       setIsLoading(false);
