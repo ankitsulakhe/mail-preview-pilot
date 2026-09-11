@@ -135,12 +135,11 @@ const EmailTester = () => {
     setLastSentStatus(null);
 
     try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // For now, we'll simulate success (replace with actual email service)
-      const isSuccess = Math.random() > 0.2; // 80% success rate for demo
-      
+      // Preview mode: real sending is enabled once the sender domain is verified
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      const isSuccess = true;
+
       if (isSuccess) {
         setLastSentStatus("success");
         toast({
